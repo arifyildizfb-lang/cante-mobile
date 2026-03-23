@@ -3,30 +3,47 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CANTE Sinyal</title>
+  <title>CANTE Sinyal Robotu</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
+
 <body>
 
 <div class="card">
-  <h1>CANTE Sinyal</h1>
 
-  <input id="symbol" value="CANTE" />
-  <button onclick="refreshData()">Güncelle</button>
+  <h1>📊 CANTE Sinyal Robotu</h1>
 
-  <p>Fiyat: <span id="price">-</span></p>
-  <p>Sinyal: <span id="signal">-</span></p>
-  <p>Stop: <span id="stop">-</span></p>
-  <p>Hedef: <span id="target">-</span></p>
+  <div style="margin-bottom:15px;">
+    <label>Hisse Kodu</label><br>
+    <input id="symbol" value="CANTE" />
+    <button id="refreshBtn" onclick="refreshData()">Güncelle</button>
+  </div>
+
+  <hr>
+
+  <h3>📈 Temel Bilgiler</h3>
+  <p>Fiyat: <b><span id="price">-</span></b></p>
+  <p>Sinyal: <b><span id="signal">-</span></b></p>
+  <p>Stop: <b><span id="stop">-</span></b></p>
+  <p>Hedef: <b><span id="target">-</span></b></p>
+
+  <hr>
+
+  <h3>🤖 Teknik Detaylar</h3>
+  <p>EMA9: <span id="ema9">-</span></p>
+  <p>EMA21: <span id="ema21">-</span></p>
+  <p>EMA50: <span id="ema50">-</span></p>
+  <p>ATR14: <span id="atr">-</span></p>
+
+  <hr>
+
+  <h3>🧠 Analiz</h3>
   <p>Sebep: <span id="reason">-</span></p>
+  <p>Son Güncelleme: <span id="asOf">-</span></p>
 
 </div>
 
 <script src="/app.js"></script>
+
 </body>
-</html> 
-<p>EMA9: <span id="ema9">-</span></p>
-<p>EMA21: <span id="ema21">-</span></p>
-<p>EMA50: <span id="ema50">-</span></p>
-<p>ATR14: <span id="atr">-</span></p>
-<p>Son Güncelleme: <span id="asOf">-</span></p>
+</html>
