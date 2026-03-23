@@ -1,52 +1,155 @@
-function ema(arr, n) {
-  const k = 2 / (n + 1);
-  let ema = arr[0];
-  return arr.map((v, i) => {
-    ema = i === 0 ? v : v * k + ema * (1 - k);
-    return ema;
+function ema(values, period) {
+  const k = 2 / (period + 1);
+  const out = [];
+  let prev = values[0] ?? 0;
+
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    prev = i === 0 ? v : v * k + prev * (1 - k);
+    out.push(prev);
+  }
+
+  return out;
+}
+
+function sma(values, period) {
+  return values.map((_, i) => {
+    if (i < period - 1) return null;
+    const slice = values.slice(i - period + 1, i + 1);
+    return slice.reduce((a, b) => a + b, 0) / period;
   });
 }
 
-function calculate(price) {
-  const fake = Array(60).fill(price).map((v, i) => v + (Math.random()-0.5)*0.05);
+function highest(values, period) {
+  return values.map((_, i) => {
+    if (i < period - 1) return null;
+    return Math.max(...values.slice(i - period + 1, i + 1));
+  });
+}
 
-  const ema9 = ema(fake, 9);
-  const ema21 = ema(fake, 21);
+function atr(highs, lows, closes, period = 14) {
+  const tr = highs.map((h, i) => {
+    if (i === 0) return h - lows[i];
+    return Math.max(
+      h - lows[i],
+      Math.abs(h - closes[i - 1]),
+      Math.abs(lows[i] - closes[i - 1])
+    );
+  });
+
+  return sma(tr, period);
+}
+
+function formatNum(v) {
+  if (v == null || Number.isNaN(v)) return "-";
+  return Number(v).toFixed(4);
+}
+
+function calculateSignal(bars) {
+  const closes = bars.map(b => Number(b.close));
+  const highs = bars.map(b => Number(b.high));
+  const lows = bars.map(b => Number(b.low));
+  const volumes = bars.map(b => Number(b.volume));
+
+  const ema9 = ema(closes, 9);
+  const ema21 = ema(closes, 21);
+  const ema50 = ema(closes, 50);
+  const vol20 = sma(volumes, 20);
+  const atr14 = atr(highs, lows, closes, 14);
+  const hh20 = highest(highs, 20);
+
+  const i = bars.length - 1;
+  const lastClose = closes[i];
+
+  const buy =
+    ema9[i] > ema21[i] &&
+    lastClose > ema50[i] &&
+    hh20[i - 1] !== null &&
+    lastClose > hh20[i - 1] &&
+    vol20[i] !== null &&
+    volumes[i] > vol20[i];
+
+  const sell =
+    ema9[i] < ema21[i] ||
+    lastClose < ema21[i];
 
   let signal = "BEKLE";
-  let reason = "Şart yok";
+  let reason = "Şartlar tam oluşmadı.";
 
-  if (ema9.at(-1) > ema21.at(-1)) {
+  if (buy) {
     signal = "AL";
-    reason = "Trend yukarı";
-  } else {
+    reason = "EMA9 > EMA21, fiyat EMA50 üstünde, direnç kırılımı ve hacim onayı var.";
+  } else if (sell) {
     signal = "SAT";
-    reason = "Trend zayıf";
+    reason = "Kısa vadeli yapı zayıfladı, EMA21 altı riskli.";
   }
+
+  const stop = atr14[i] ? lastClose - atr14[i] * 2 : null;
+  const target = atr14[i] ? lastClose + atr14[i] * 3 : null;
 
   return {
     signal,
-    stop: price * 0.96,
-    target: price * 1.08,
-    reason
+    reason,
+    close: lastClose,
+    ema9: ema9[i],
+    ema21: ema21[i],
+    ema50: ema50[i],
+    atr: atr14[i],
+    stop,
+    target
   };
 }
 
 async function refreshData() {
-  const symbol = document.getElementById("symbol").value;
+  const symbolInput = document.getElementById("symbol");
+  const btn = document.getElementById("refreshBtn");
 
-  const res = await fetch(`/api/quote?symbol=${symbol}`);
-  const data = await res.json();
+  const symbol = (symbolInput?.value || "CANTE").trim().toUpperCase();
 
-  const price = data.price;
+  try {
+    btn.disabled = true;
+    btn.textContent = "Alınıyor...";
 
-  const r = calculate(price);
+    const res = await fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`);
+    const data = await res.json();
 
-  document.getElementById("price").innerText = price.toFixed(2);
-  document.getElementById("signal").innerText = r.signal;
-  document.getElementById("stop").innerText = r.stop.toFixed(2);
-  document.getElementById("target").innerText = r.target.toFixed(2);
-  document.getElementById("reason").innerText = r.reason;
+    if (!res.ok) {
+      throw new Error(data.error || "Veri alınamadı");
+    }
+
+    const bars = Array.isArray(data.bars) ? data.bars : [];
+
+    if (bars.length < 20) {
+      throw new Error("Yeterli geçmiş veri yok");
+    }
+
+    const result = calculateSignal(bars);
+
+    document.getElementById("price").innerText =
+      data.price != null ? Number(data.price).toFixed(4) : "-";
+
+    document.getElementById("signal").innerText = result.signal;
+    document.getElementById("stop").innerText = formatNum(result.stop);
+    document.getElementById("target").innerText = formatNum(result.target);
+    document.getElementById("reason").innerText = result.reason;
+
+    const ema9El = document.getElementById("ema9");
+    const ema21El = document.getElementById("ema21");
+    const ema50El = document.getElementById("ema50");
+    const atrEl = document.getElementById("atr");
+    const asOfEl = document.getElementById("asOf");
+
+    if (ema9El) ema9El.innerText = formatNum(result.ema9);
+    if (ema21El) ema21El.innerText = formatNum(result.ema21);
+    if (ema50El) ema50El.innerText = formatNum(result.ema50);
+    if (atrEl) atrEl.innerText = formatNum(result.atr);
+    if (asOfEl) asOfEl.innerText = data.asOf || "-";
+  } catch (err) {
+    document.getElementById("reason").innerText = err.message || "Bir hata oluştu";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Güncelle";
+  }
 }
 
 window.onload = refreshData;
